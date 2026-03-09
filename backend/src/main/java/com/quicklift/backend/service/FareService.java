@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.EnumMap;
+import java.util.Map;
 
 @Service
 public class FareService {
@@ -14,7 +16,16 @@ public class FareService {
     
     // Per-kilometer rate in rupees
     private static final BigDecimal RATE_PER_KM = new BigDecimal("11.00");
-    private static final BigDecimal VAN_MULTIPLIER = new BigDecimal("1.50");
+    private static final BigDecimal DEFAULT_MULTIPLIER = BigDecimal.ONE;
+    private static final Map<VehicleType, BigDecimal> VEHICLE_MULTIPLIERS = new EnumMap<>(VehicleType.class);
+
+    static {
+        VEHICLE_MULTIPLIERS.put(VehicleType.SEDAN, new BigDecimal("1.00"));
+        VEHICLE_MULTIPLIERS.put(VehicleType.SUV, new BigDecimal("1.25"));
+        VEHICLE_MULTIPLIERS.put(VehicleType.LUXURY, new BigDecimal("1.60"));
+        VEHICLE_MULTIPLIERS.put(VehicleType.MOTORCYCLE, new BigDecimal("0.70"));
+        VEHICLE_MULTIPLIERS.put(VehicleType.VAN, new BigDecimal("1.40"));
+    }
 
     public double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
         double latDistance = Math.toRadians(lat2 - lat1);
@@ -43,11 +54,12 @@ public class FareService {
         );
 
         BigDecimal tolls = request.getTolls() != null ? request.getTolls() : BigDecimal.ZERO;
-        BigDecimal fare = calculateFare(distance, tolls);
-        if (request.getVehicleType() == VehicleType.VAN) {
-            return fare.multiply(VAN_MULTIPLIER).setScale(2, RoundingMode.HALF_UP);
-        }
-        return fare;
+        BigDecimal baseFare = calculateFare(distance, tolls);
+        BigDecimal multiplier = request.getVehicleType() == null
+                ? DEFAULT_MULTIPLIER
+                : VEHICLE_MULTIPLIERS.getOrDefault(request.getVehicleType(), DEFAULT_MULTIPLIER);
+
+        return baseFare.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal calculateFare(double distance, BigDecimal tolls) {
