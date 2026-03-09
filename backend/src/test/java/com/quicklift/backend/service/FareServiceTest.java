@@ -1,6 +1,7 @@
 package com.quicklift.backend.service;
 
 import com.quicklift.backend.dto.TripRequest;
+import com.quicklift.backend.model.VehicleType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -65,5 +66,20 @@ class FareServiceTest {
                 () -> fareService.calculateFare(request));
 
         assertEquals("Pickup/destination coordinates are required to estimate fare.", exception.getMessage());
+    }
+
+    @Test
+    void calculateFare_tripRequestWithVan_appliesOnePointFiveMultiplier() {
+        TripRequest request = new TripRequest();
+        request.setPickupLatitude(new BigDecimal("40.4168"));
+        request.setPickupLongitude(new BigDecimal("-3.7038"));
+        request.setDestinationLatitude(new BigDecimal("40.4170"));
+        request.setDestinationLongitude(new BigDecimal("-3.7000"));
+        request.setTolls(BigDecimal.ZERO);
+        request.setVehicleType(VehicleType.VAN);
+
+        BigDecimal fare = fareService.calculateFare(request);
+
+        assertEquals(new BigDecimal("5.33"), fare);
     }
 }

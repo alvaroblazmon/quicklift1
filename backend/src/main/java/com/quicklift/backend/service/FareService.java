@@ -1,6 +1,7 @@
 package com.quicklift.backend.service;
 
 import com.quicklift.backend.dto.TripRequest;
+import com.quicklift.backend.model.VehicleType;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -13,6 +14,7 @@ public class FareService {
     
     // Per-kilometer rate in rupees
     private static final BigDecimal RATE_PER_KM = new BigDecimal("11.00");
+    private static final BigDecimal VAN_MULTIPLIER = new BigDecimal("1.50");
 
     public double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
         double latDistance = Math.toRadians(lat2 - lat1);
@@ -41,7 +43,11 @@ public class FareService {
         );
 
         BigDecimal tolls = request.getTolls() != null ? request.getTolls() : BigDecimal.ZERO;
-        return calculateFare(distance, tolls);
+        BigDecimal fare = calculateFare(distance, tolls);
+        if (request.getVehicleType() == VehicleType.VAN) {
+            return fare.multiply(VAN_MULTIPLIER).setScale(2, RoundingMode.HALF_UP);
+        }
+        return fare;
     }
 
     public BigDecimal calculateFare(double distance, BigDecimal tolls) {
