@@ -1,18 +1,27 @@
 package com.quicklift.backend.service;
 
 import com.quicklift.backend.dto.TripRequest;
+import com.quicklift.backend.model.VehicleType;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Map;
 
 @Service
 public class FareService {
 
     private static final double EARTH_RADIUS_KM = 6371;
     
-    // Per-kilometer rate in rupees
     private static final BigDecimal RATE_PER_KM = new BigDecimal("11.00");
+    private static final BigDecimal DEFAULT_MULTIPLIER = BigDecimal.ONE;
+    private static final Map<VehicleType, BigDecimal> VEHICLE_MULTIPLIERS = Map.of(
+            VehicleType.SEDAN, new BigDecimal("1.0"),
+            VehicleType.SUV, new BigDecimal("1.25"),
+            VehicleType.LUXURY, new BigDecimal("1.6"),
+            VehicleType.MOTORCYCLE, new BigDecimal("0.7"),
+            VehicleType.VAN, new BigDecimal("1.4")
+    );
 
     public double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
         double latDistance = Math.toRadians(lat2 - lat1);
@@ -27,9 +36,6 @@ public class FareService {
     public BigDecimal calculateFare(TripRequest request) {
         if (request.getPickupLatitude() == null || request.getPickupLongitude() == null ||
             request.getDestinationLatitude() == null || request.getDestinationLongitude() == null) {
-            // Cannot calculate fare without coordinates, return a default or throw exception
-            // For now, let's return a default value or handle as an error.
-            // Returning zero or a default could be misleading. Let's throw an exception.
             throw new IllegalArgumentException("Pickup/destination coordinates are required to estimate fare.");
         }
 
@@ -41,7 +47,12 @@ public class FareService {
         );
 
         BigDecimal tolls = request.getTolls() != null ? request.getTolls() : BigDecimal.ZERO;
-        return calculateFare(distance, tolls);
+        BigDecimal baseFare = calculateFare(distance, tolls);
+        VehicleType vehicleType = request.getVehicleType();
+        BigDecimal multiplier = vehicleType == null
+                ? DEFAULT_MULTIPLIER
+                : VEHICLE_MULTIPLIERS.getOrDefault(vehicleType, DEFAULT_MULTIPLIER);
+        return baseFare.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal calculateFare(double distance, BigDecimal tolls) {
