@@ -1,10 +1,13 @@
 package com.quicklift.backend.service;
 
 import com.quicklift.backend.dto.TripRequest;
+import com.quicklift.backend.model.VehicleType;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.EnumMap;
+import java.util.Map;
 
 @Service
 public class FareService {
@@ -13,6 +16,15 @@ public class FareService {
     
     // Per-kilometer rate in rupees
     private static final BigDecimal RATE_PER_KM = new BigDecimal("11.00");
+    private static final Map<VehicleType, BigDecimal> VEHICLE_MULTIPLIERS = new EnumMap<>(VehicleType.class);
+
+    static {
+        VEHICLE_MULTIPLIERS.put(VehicleType.SEDAN, new BigDecimal("1.0"));
+        VEHICLE_MULTIPLIERS.put(VehicleType.SUV, new BigDecimal("1.25"));
+        VEHICLE_MULTIPLIERS.put(VehicleType.LUXURY, new BigDecimal("1.6"));
+        VEHICLE_MULTIPLIERS.put(VehicleType.MOTORCYCLE, new BigDecimal("0.7"));
+        VEHICLE_MULTIPLIERS.put(VehicleType.VAN, new BigDecimal("1.4"));
+    }
 
     public double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
         double latDistance = Math.toRadians(lat2 - lat1);
@@ -41,11 +53,17 @@ public class FareService {
         );
 
         BigDecimal tolls = request.getTolls() != null ? request.getTolls() : BigDecimal.ZERO;
-        return calculateFare(distance, tolls);
+        return calculateFare(distance, tolls, request.getVehicleType());
     }
 
     public BigDecimal calculateFare(double distance, BigDecimal tolls) {
-        BigDecimal distanceCost = BigDecimal.valueOf(distance).multiply(RATE_PER_KM);
-        return distanceCost.add(tolls).setScale(2, RoundingMode.HALF_UP);
+        return calculateFare(distance, tolls, null);
     }
-} 
+
+    public BigDecimal calculateFare(double distance, BigDecimal tolls, VehicleType vehicleType) {
+        BigDecimal distanceCost = BigDecimal.valueOf(distance).multiply(RATE_PER_KM);
+        BigDecimal baseFare = distanceCost.add(tolls);
+        BigDecimal multiplier = VEHICLE_MULTIPLIERS.getOrDefault(vehicleType, BigDecimal.ONE);
+        return baseFare.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+    }
+}
