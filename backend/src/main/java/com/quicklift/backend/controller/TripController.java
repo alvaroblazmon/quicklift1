@@ -2,10 +2,12 @@ package com.quicklift.backend.controller;
 
 import com.quicklift.backend.dto.TripRequest;
 import com.quicklift.backend.dto.FareResponse;
+import com.quicklift.backend.exception.GeocodingException;
 import com.quicklift.backend.model.Trip;
 import com.quicklift.backend.model.TripStatus;
 import com.quicklift.backend.model.User;
 import com.quicklift.backend.service.FareService;
+import com.quicklift.backend.service.TripCoordinateResolverService;
 import com.quicklift.backend.service.TripService;
 import com.quicklift.backend.service.UserService;
 import jakarta.validation.Valid;
@@ -33,17 +35,23 @@ public class TripController {
     @Autowired
     private FareService fareService;
 
+    @Autowired
+    private TripCoordinateResolverService tripCoordinateResolverService;
+
     @PostMapping("/estimate")
     public ResponseEntity<?> estimateFare(@Valid @RequestBody TripRequest tripRequest) {
         try {
+            TripRequest resolvedRequest = tripCoordinateResolverService.resolveCoordinates(tripRequest);
             double distance = fareService.calculateDistance(
-                tripRequest.getPickupLatitude().doubleValue(),
-                tripRequest.getPickupLongitude().doubleValue(),
-                tripRequest.getDestinationLatitude().doubleValue(),
-                tripRequest.getDestinationLongitude().doubleValue()
+                resolvedRequest.getPickupLatitude().doubleValue(),
+                resolvedRequest.getPickupLongitude().doubleValue(),
+                resolvedRequest.getDestinationLatitude().doubleValue(),
+                resolvedRequest.getDestinationLongitude().doubleValue()
             );
-            BigDecimal estimatedFare = fareService.calculateFare(tripRequest);
+            BigDecimal estimatedFare = fareService.calculateFare(resolvedRequest);
             return ResponseEntity.ok(new FareResponse(estimatedFare, distance));
+        } catch (GeocodingException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
